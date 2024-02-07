@@ -1,0 +1,91 @@
+*spooky.txt*	Actions at a distance
+
+INTRODUCTION                                   *spooky.nvim* *spooky-introduction*
+
+Spooky is a Neovim plugin that defines "remote" text objects: that is, it
+exposes atomic bundles of jumps and selection commands. Spooky uses Leap
+(https://github.com/ggandor/leap.nvim) as the default jump engine, but in fact
+the plugin is jumper-agnostic - you can use or define any custom function you
+want.
+
+USAGE                                                             *spooky-usage*
+
+The jump function is automatically invoked once the text object is specified;
+after e.g. `yarw`, select the target as you would usually do, to define the
+point of reference for the selection. The difference is that instead of jumping
+there, the word will be yanked.
+
+FUNCTIONS                                                     *spooky-functions*
+
+spooky.setup()	                                                *spooky.setup()*
+    Create remote text objects from all native ones, by inserting `r` into the
+    middle (e.g. `ip` -> `irp`), using Leap as the targeting engine (searching
+    in all windows).
+
+	                                           *spooky.create_text_object()*
+spooky.create_text_object({mapping}, {jumper}, {selector}, {*opts})
+    Create a remote text object using {jumper} and {selector}.
+
+    Parameters:
+      • {mapping}   (string) Mapping to be used.
+      • {jumper}    (function) Lua callback that moves the cursor to the
+                    reference point.
+      • {selector}  (function) Lua callback that visually selects a range.
+      • {opts}      (dictionary) Options:
+                    • event_data (dictionary) Additional data to be sent back
+                      on |SpookyOperationDone|.
+
+    Example (inner remote line): >lua
+        require('spooky').create_text_object(
+          'ii',
+          function ()
+            require('leap').leap {
+              target_windows = { vim.api.nvim_get_current_win() }
+            }
+          end,
+          function ()
+            local mode = vim.fn.mode(true)
+            -- Exit Visual mode if already in it.
+            if not mode:match('o') then
+              vim.cmd('normal! ' .. mode:sub(1,1))
+            end
+            vim.cmd('normal! _vg_')
+          end
+        )
+
+spooky.selector({text_object})                               *spooky.selector()*
+    Wrap {text_object} into a selector function that propagates forced motions
+    correctly.
+
+    Parameters:
+      • {text_object}  (string) Text object selection command.
+
+EVENTS                                                           *spooky-events*
+
+After the operation has been finished, the |User| event is triggered with
+the *SpookyOperationDone* pattern.
+
+The `data` field of |v:event| is automatically filled with:
+    • restore_cursor (function) Lua callback to restore the window and the
+      cursor position.
+    • register (string) Value of |v:register| at the time of the operation.
+    • mapping (string) Mapping used for the command.
+
+Setting "boomerang" behavior and automatic paste after yanking: >lua
+    vim.api.nvim_create_augroup('SpookyUser', {})
+    vim.api.nvim_create_autocmd('User', {
+      pattern = 'SpookyOperationDone',
+      group = 'SpookyUser',
+      callback = function (event)
+        local op = vim.v.operator
+        -- Restore cursor position (except after change operation).
+        if op ~= 'c' then event.data.restore_cursor() end
+        -- (Auto)paste after yanking and restoring the cursor, if the
+        -- unnamed register was used.
+        if op == 'y' and event.data.register == '"' then
+          vim.cmd('normal! p')
+        end
+      end
+    })
+
+vim:tw=78:ts=8:ft=help:norl:
