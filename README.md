@@ -117,13 +117,18 @@ do
   -- default.
 
   -- `range` is specified by two consecutive jumps (end-inclusive -
-  -- use `v` to make it exclusive). With `V`, you can use it to select
-  -- arbitrary line ranges.
+  -- use `v` to make it exclusive).
   spooky.create_text_object('arr', leap_anywhere, spooky.selectors.range)
-  -- With custom end-jumper (default is Leap in current window).
-  -- (A `state` table is automatically passed to selector functions as
+  -- Line-range.
+  -- A `state` table is automatically passed to selector functions as
   -- a first argument, containing the saved values of `vim.fn.mode(true)`
-  -- and `vim.v.count1` [the jumper function can mess with those].)
+  -- and `vim.v.count1` (the jumper function can mess with those). Make
+  -- sure to pass it on if you're wrapping the call.
+  spooky.create_text_object('arR', leap_anywhere, function (state)
+    spooky.selectors.range(state)
+    vim.cmd('normal! V')
+  end)
+  -- Custom second jumper (default is Leap in current window).
   spooky.create_text_object('arr', leap_anywhere, function (state)
     spooky.selectors.range(state, { jumper = leap_anywhere })
   end)
